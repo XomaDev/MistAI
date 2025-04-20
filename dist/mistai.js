@@ -102,10 +102,32 @@ function doResize(e) {
         codeSpace.style.width = `${newPercent}%`;
     }
 }
+function monitorBlockly() {
+    var _a, _b;
+    const workspace = (_b = (_a = window.Blockly) === null || _a === void 0 ? void 0 : _a.getMainWorkspace) === null || _b === void 0 ? void 0 : _b.call(_a);
+    if (workspace) {
+        workspace.addChangeListener((event) => {
+            var _a, _b;
+            if (event.type === window.Blockly.Events.SELECTED) {
+                const block = (_b = (_a = window.Blockly) === null || _a === void 0 ? void 0 : _a.getMainWorkspace()) === null || _b === void 0 ? void 0 : _b.getBlockById(event.newElementId);
+                const xml = document.createElement('xml');
+                xml.appendChild(window.Blockly.Xml.blockToDom(block, true));
+                const code = window.Blockly.Xml.domToText(xml);
+                console.log(code);
+            }
+            if (event.type === window.Blockly.Events.BLOCK_MOVE) {
+                if (!event.oldLocation) {
+                    // TODO: refresh mist code here
+                }
+            }
+        });
+    }
+}
 // keep attempting to add the code workspace, sometimes project may not be fully loaded
 const intervalId = setInterval(() => {
     if (addCodeSpace()) {
         addMistButton();
+        monitorBlockly();
         clearInterval(intervalId);
         console.log("Code space was added!");
     }

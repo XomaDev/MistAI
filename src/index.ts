@@ -6,6 +6,7 @@
 
 console.log('Happy developing ✨')
 
+// == BEGIN UI ==
 const frameUrl = "https://mist-playground.vercel.app/"
 let codeSpaceShown = false
 let resizing = false // user is resizing code editor
@@ -117,10 +118,42 @@ function doResize(e: MouseEvent) {
   }
 }
 
+// == END UI ==
+// == START BLOCKLY CODE ==
+
+function getXmlCode(blockId: String) {
+  const block = (window as any).Blockly?.getMainWorkspace()?.getBlockById(blockId);
+  const xml = document.createElement('xml');
+  xml.appendChild((window as any).Blockly.Xml.blockToDom(block, true));
+  return (window as any).Blockly.Xml.domToText(xml);
+}
+
+function monitorBlockly() {
+  const workspace = (window as any).Blockly?.getMainWorkspace?.();
+  if (workspace) {
+    workspace.addChangeListener((event: any) => {
+      if (event.type === (window as any).Blockly.Events.SELECTED) {
+        const blockId = event.newElementId
+        if (blockId == null) {
+          // TODO: nothing selected, refresh all mist code here
+        } else {
+          const xmlCode = getXmlCode(blockId);
+          console.log(xmlCode)
+          // TODO:
+          //  Now we send it over to the API for translation!
+        }
+      }
+    });
+  }
+}
+
+// == END BLOCKLY CODE ==
+
 // keep attempting to add the code workspace, sometimes project may not be fully loaded
 const intervalId = setInterval(() => {
   if (addCodeSpace()) {
     addMistButton()
+    monitorBlockly()
     clearInterval(intervalId)
     console.log("Code space was added!")
   }
