@@ -19,11 +19,10 @@ function addMistButton() {
     const container = panels[panels.length - 1];
     container.appendChild(button);
     button.addEventListener("click", () => {
-        console.log("clicked");
         const codeSpace = document.getElementById("codeSpace");
         if (codeSpace == null)
             return;
-        codeSpace.style.display = codeSpaceShown ? "block" : "none";
+        codeSpace.style.display = codeSpaceShown ? "none" : "block";
         codeSpaceShown = !codeSpaceShown;
     });
     return true;
@@ -97,7 +96,7 @@ function doResize(e) {
         const parent = codeSpace.parentElement;
         const parentRect = parent.getBoundingClientRect();
         const parentWidth = parentRect.width;
-        const newPixelWidth = parentRect.right - e.clientX; // or e.clientX - parentRect.left, depending on which edge resizer is on
+        const newPixelWidth = parentRect.right - e.clientX;
         let newPercent = (newPixelWidth / parentWidth) * 100;
         newPercent = Math.min(Math.max(newPercent, 10), 90);
         codeSpace.style.width = `${newPercent}%`;

@@ -24,7 +24,7 @@ function addMistButton() {
   button.addEventListener("click", () => {
     const codeSpace = document.getElementById("codeSpace")
     if (codeSpace == null) return
-    codeSpace.style.display = codeSpaceShown ? "block" : "none"
+    codeSpace.style.display = codeSpaceShown ? "none" : "block"
     codeSpaceShown = !codeSpaceShown
   })
 
@@ -110,7 +110,7 @@ function doResize(e: MouseEvent) {
     const parentRect = parent.getBoundingClientRect();
     const parentWidth = parentRect.width;
 
-    const newPixelWidth = parentRect.right - e.clientX; // or e.clientX - parentRect.left, depending on which edge resizer is on
+    const newPixelWidth = parentRect.right - e.clientX;
     let newPercent = (newPixelWidth / parentWidth) * 100;
     newPercent = Math.min(Math.max(newPercent, 10), 90);
     codeSpace.style.width = `${newPercent}%`;
