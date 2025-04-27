@@ -6,14 +6,17 @@
 
 console.log('Happy developing ✨')
 
-const MIST_ENDPOINT = "http://localhost:2103/mist?manyBlocks="
+const MIST_ENDPOINT = "http://localhost:2103/mist"
 const FRAME_URL = "https://mist-playground.vercel.app/"
+const MIST_JS = "https://cdn.jsdelivr.net/gh/XomaDev/compiled-bins/mist.js"
 
 const FILTER_BLOCKS = ["component_event", "global_declaration", "procedures_defreturn", "procedures_defnoreturn"]
 
 let codeSpaceShown = false
 let resizing = false // user is resizing code editor
 let blocklyRegistered = false
+
+let selectedBlockIds: Set<string> = new Set();
 
 // == BEGIN UI ==
 function addMistButton() {
@@ -152,13 +155,18 @@ function monitorBlockly() {
       const blockId = event.newElementId
       if (event.type == (window as any).Blockly.Events.SELECTED) {
         if (blockId != null) {
-          const xmlCode = getXmlCode(blockId);
-          console.log(xmlCode)
-          translateToMist(xmlCode, false);
+          selectedBlockIds.add(blockId)
+          translateToMist(getManyXmlCodes(Array.from(selectedBlockIds)))
           return;
         } else {
+          selectedBlockIds = new Set()
+          console.log("Unselected!")
           generateMistAll()
         }
+      } else if (event.type == "screen.switch") {
+        generateMistAll()
+      } else {
+        console.log("Event Not Handled: " + event.type)
       }
     });
     blocklyRegistered = true
@@ -166,16 +174,16 @@ function monitorBlockly() {
 }
 
 function generateMistAll() {
-  const allBlockXMLs = (window as any).Blockly?.getMainWorkspace()
+  const allXmlBlockIds = (window as any).Blockly?.getMainWorkspace()
     .getTopBlocks()
     .filter((block: any) => FILTER_BLOCKS.indexOf(block.type) > -1)
     .map((block: any) => block.id);
-  translateToMist(getManyXmlCodes(allBlockXMLs), true)
+  translateToMist(getManyXmlCodes(allXmlBlockIds))
 }
 
-async function translateToMist(xmlContent: string, manyBlocks: boolean) {
+async function translateToMist(xmlContent: string) {
   try {
-    const response = await fetch(MIST_ENDPOINT + manyBlocks, {
+    const response = await fetch(MIST_ENDPOINT, {
       method: 'POST',
       headers: {"Content-Type": "text/plain"},
       body: xmlContent,
@@ -194,7 +202,25 @@ async function translateToMist(xmlContent: string, manyBlocks: boolean) {
   }
 }
 
+/**
+ * Called by Mist JS
+ */
+function mistOutput(output: any) {
+  console.log(output)
+}
+
 // == END BLOCKLY CODE ==
+
+// == BEGIN PRELOAD
+const script = document.createElement("script");
+script.src = MIST_JS
+script.async = true
+script.onload = (e) => {
+  console.log("Mist JS was Loaded!");
+  (window as any).main() // starts Mist JS
+}
+document.head.appendChild(script)
+// == END PRELOAD
 
 // keep attempting to add the code workspace, sometimes project may not be fully loaded
 const intervalId = setInterval(() => {
