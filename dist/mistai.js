@@ -118,19 +118,19 @@ function doResize(e) {
 }
 // == END UI ==
 // == START BLOCKLY CODE ==
-function getXmlCode(blockId) {
+function getBlock(blockId) {
     var _a, _b;
-    const block = (_b = (_a = window.Blockly) === null || _a === void 0 ? void 0 : _a.getMainWorkspace()) === null || _b === void 0 ? void 0 : _b.getBlockById(blockId);
+    return (_b = (_a = window.Blockly) === null || _a === void 0 ? void 0 : _a.getMainWorkspace()) === null || _b === void 0 ? void 0 : _b.getBlockById(blockId);
+}
+function getXmlCode(blockId) {
     const xml = document.createElement('xml');
-    xml.appendChild(window.Blockly.Xml.blockToDom(block, true));
+    xml.appendChild(window.Blockly.Xml.blockToDom(getBlock(blockId), true));
     return window.Blockly.Xml.domToText(xml);
 }
 function getManyXmlCodes(blockIds) {
-    var _a, _b;
     const xml = document.createElement('xml');
     for (const blockId of blockIds) {
-        const block = (_b = (_a = window.Blockly) === null || _a === void 0 ? void 0 : _a.getMainWorkspace()) === null || _b === void 0 ? void 0 : _b.getBlockById(blockId);
-        xml.appendChild(window.Blockly.Xml.blockToDom(block, true));
+        xml.appendChild(window.Blockly.Xml.blockToDom(getBlock(blockId), true));
     }
     return window.Blockly.Xml.domToText(xml);
 }
@@ -139,15 +139,16 @@ function monitorBlockly() {
     const workspace = (_b = (_a = window.Blockly) === null || _a === void 0 ? void 0 : _a.getMainWorkspace) === null || _b === void 0 ? void 0 : _b.call(_a);
     if (workspace) {
         workspace.addChangeListener((event) => {
-            if (event.type === window.Blockly.Events.SELECTED) {
-                const blockId = event.newElementId;
-                if (blockId == null) {
-                    generateMistAll();
-                }
-                else {
+            const blockId = event.newElementId;
+            if (event.type == window.Blockly.Events.SELECTED) {
+                if (blockId != null) {
                     const xmlCode = getXmlCode(blockId);
                     console.log(xmlCode);
                     translateToMist(xmlCode, false);
+                    return;
+                }
+                else {
+                    generateMistAll();
                 }
             }
         });

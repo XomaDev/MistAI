@@ -127,18 +127,20 @@ function doResize(e: MouseEvent) {
 // == END UI ==
 // == START BLOCKLY CODE ==
 
+function getBlock(blockId: string) {
+  return (window as any).Blockly?.getMainWorkspace()?.getBlockById(blockId);
+}
+
 function getXmlCode(blockId: string) {
-  const block = (window as any).Blockly?.getMainWorkspace()?.getBlockById(blockId);
   const xml = document.createElement('xml');
-  xml.appendChild((window as any).Blockly.Xml.blockToDom(block, true));
+  xml.appendChild((window as any).Blockly.Xml.blockToDom(getBlock(blockId), true));
   return (window as any).Blockly.Xml.domToText(xml);
 }
 
 function getManyXmlCodes(blockIds: string[]) {
   const xml = document.createElement('xml');
   for (const blockId of blockIds) {
-    const block = (window as any).Blockly?.getMainWorkspace()?.getBlockById(blockId);
-    xml.appendChild((window as any).Blockly.Xml.blockToDom(block, true));
+    xml.appendChild((window as any).Blockly.Xml.blockToDom(getBlock(blockId), true));
   }
   return (window as any).Blockly.Xml.domToText(xml);
 }
@@ -147,14 +149,15 @@ function monitorBlockly() {
   const workspace = (window as any).Blockly?.getMainWorkspace?.();
   if (workspace) {
     workspace.addChangeListener((event: any) => {
-      if (event.type === (window as any).Blockly.Events.SELECTED) {
-        const blockId = event.newElementId
-        if (blockId == null) {
-          generateMistAll()
-        } else {
+      const blockId = event.newElementId
+      if (event.type == (window as any).Blockly.Events.SELECTED) {
+        if (blockId != null) {
           const xmlCode = getXmlCode(blockId);
           console.log(xmlCode)
-          translateToMist(xmlCode, false)
+          translateToMist(xmlCode, false);
+          return;
+        } else {
+          generateMistAll()
         }
       }
     });
