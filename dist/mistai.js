@@ -16,7 +16,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 console.log('Happy developing ✨');
 const MIST_ENDPOINT = "http://localhost:2103/mist";
 const FRAME_URL = "https://mist-playground.vercel.app/";
-const MIST_JS = "https://cdn.jsdelivr.net/gh/XomaDev/compiled-bins/mist.js";
+const MIST_JS = "https://cdn.jsdelivr.net/gh/XomaDev/compiled-bins/mist-x.js";
 const FILTER_BLOCKS = ["component_event", "global_declaration", "procedures_defreturn", "procedures_defnoreturn"];
 let editorCode = "";
 let codeSpaceShown = false;
