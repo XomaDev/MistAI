@@ -4,10 +4,23 @@
 // @match https://*.appinventor.mit.edu/*
 // @match http://localhost/*
 // ==/UserScript==
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 console.log('Happy developing ✨');
-const frameUrl = "https://mist-playground.vercel.app/";
+const MIST_ENDPOINT = "http://localhost:2103/mist?manyBlocks=";
+const FRAME_URL = "https://mist-playground.vercel.app/";
+const FILTER_BLOCKS = ["component_event", "global_declaration", "procedures_defreturn", "procedures_defnoreturn"];
 let codeSpaceShown = false;
 let resizing = false; // user is resizing code editor
+let blocklyRegistered = false;
+// == BEGIN UI ==
 function addMistButton() {
     const button = document.createElement("div");
     button.classList.add("ode-TextButton");
@@ -64,7 +77,8 @@ function addCodeSpace() {
     content.appendChild(header);
     // the code editor!
     const frame = document.createElement("iframe");
-    frame.src = frameUrl;
+    frame.id = "mistFrame";
+    frame.src = FRAME_URL;
     frame.style.width = "100%";
     frame.style.height = "100%";
     frame.style.border = "none";
@@ -102,27 +116,74 @@ function doResize(e) {
         codeSpace.style.width = `${newPercent}%`;
     }
 }
+// == END UI ==
+// == START BLOCKLY CODE ==
+function getXmlCode(blockId) {
+    var _a, _b;
+    const block = (_b = (_a = window.Blockly) === null || _a === void 0 ? void 0 : _a.getMainWorkspace()) === null || _b === void 0 ? void 0 : _b.getBlockById(blockId);
+    const xml = document.createElement('xml');
+    xml.appendChild(window.Blockly.Xml.blockToDom(block, true));
+    return window.Blockly.Xml.domToText(xml);
+}
+function getManyXmlCodes(blockIds) {
+    var _a, _b;
+    const xml = document.createElement('xml');
+    for (const blockId of blockIds) {
+        const block = (_b = (_a = window.Blockly) === null || _a === void 0 ? void 0 : _a.getMainWorkspace()) === null || _b === void 0 ? void 0 : _b.getBlockById(blockId);
+        xml.appendChild(window.Blockly.Xml.blockToDom(block, true));
+    }
+    return window.Blockly.Xml.domToText(xml);
+}
 function monitorBlockly() {
     var _a, _b;
     const workspace = (_b = (_a = window.Blockly) === null || _a === void 0 ? void 0 : _a.getMainWorkspace) === null || _b === void 0 ? void 0 : _b.call(_a);
     if (workspace) {
         workspace.addChangeListener((event) => {
-            var _a, _b;
             if (event.type === window.Blockly.Events.SELECTED) {
-                const block = (_b = (_a = window.Blockly) === null || _a === void 0 ? void 0 : _a.getMainWorkspace()) === null || _b === void 0 ? void 0 : _b.getBlockById(event.newElementId);
-                const xml = document.createElement('xml');
-                xml.appendChild(window.Blockly.Xml.blockToDom(block, true));
-                const code = window.Blockly.Xml.domToText(xml);
-                console.log(code);
-            }
-            if (event.type === window.Blockly.Events.BLOCK_MOVE) {
-                if (!event.oldLocation) {
-                    // TODO: refresh mist code here
+                const blockId = event.newElementId;
+                if (blockId == null) {
+                    generateMistAll();
+                }
+                else {
+                    const xmlCode = getXmlCode(blockId);
+                    console.log(xmlCode);
+                    translateToMist(xmlCode, false);
                 }
             }
         });
+        blocklyRegistered = true;
     }
 }
+function generateMistAll() {
+    var _a;
+    const allBlockXMLs = (_a = window.Blockly) === null || _a === void 0 ? void 0 : _a.getMainWorkspace().getTopBlocks().filter((block) => FILTER_BLOCKS.indexOf(block.type) > -1).map((block) => block.id);
+    translateToMist(getManyXmlCodes(allBlockXMLs), true);
+}
+function translateToMist(xmlContent, manyBlocks) {
+    return __awaiter(this, void 0, void 0, function* () {
+        var _a;
+        try {
+            const response = yield fetch(MIST_ENDPOINT + manyBlocks, {
+                method: 'POST',
+                headers: { "Content-Type": "text/plain" },
+                body: xmlContent,
+            });
+            const mistCode = yield response.text();
+            console.log(mistCode);
+            const mistFrame = document.getElementById("mistFrame");
+            if (mistFrame == null) {
+                console.log("Mist frame is null!");
+            }
+            else {
+                (_a = mistFrame.contentWindow) === null || _a === void 0 ? void 0 : _a.postMessage(mistCode, '*');
+            }
+        }
+        catch (error) {
+            console.log(error);
+        }
+    });
+}
+// == END BLOCKLY CODE ==
 // keep attempting to add the code workspace, sometimes project may not be fully loaded
 const intervalId = setInterval(() => {
     if (addCodeSpace()) {
@@ -132,3 +193,6 @@ const intervalId = setInterval(() => {
         console.log("Code space was added!");
     }
 }, 1700);
+window.addEventListener('hashchange', (event) => {
+    monitorBlockly();
+});

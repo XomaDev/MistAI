@@ -6,11 +6,16 @@
 
 console.log('Happy developing ✨')
 
-// == BEGIN UI ==
-const frameUrl = "https://mist-playground.vercel.app/"
+const MIST_ENDPOINT = "http://localhost:2103/mist?manyBlocks="
+const FRAME_URL = "https://mist-playground.vercel.app/"
+
+const FILTER_BLOCKS = ["component_event", "global_declaration", "procedures_defreturn", "procedures_defnoreturn"]
+
 let codeSpaceShown = false
 let resizing = false // user is resizing code editor
+let blocklyRegistered = false
 
+// == BEGIN UI ==
 function addMistButton() {
   const button = document.createElement("div")
   button.classList.add("ode-TextButton")
@@ -75,7 +80,8 @@ function addCodeSpace() {
 
   // the code editor!
   const frame = document.createElement("iframe")
-  frame.src = frameUrl
+  frame.id = "mistFrame"
+  frame.src = FRAME_URL
   frame.style.width = "100%"
   frame.style.height = "100%"
   frame.style.border = "none"
@@ -121,10 +127,19 @@ function doResize(e: MouseEvent) {
 // == END UI ==
 // == START BLOCKLY CODE ==
 
-function getXmlCode(blockId: String) {
+function getXmlCode(blockId: string) {
   const block = (window as any).Blockly?.getMainWorkspace()?.getBlockById(blockId);
   const xml = document.createElement('xml');
   xml.appendChild((window as any).Blockly.Xml.blockToDom(block, true));
+  return (window as any).Blockly.Xml.domToText(xml);
+}
+
+function getManyXmlCodes(blockIds: string[]) {
+  const xml = document.createElement('xml');
+  for (const blockId of blockIds) {
+    const block = (window as any).Blockly?.getMainWorkspace()?.getBlockById(blockId);
+    xml.appendChild((window as any).Blockly.Xml.blockToDom(block, true));
+  }
   return (window as any).Blockly.Xml.domToText(xml);
 }
 
@@ -135,15 +150,44 @@ function monitorBlockly() {
       if (event.type === (window as any).Blockly.Events.SELECTED) {
         const blockId = event.newElementId
         if (blockId == null) {
-          // TODO: nothing selected, refresh all mist code here
+          generateMistAll()
         } else {
           const xmlCode = getXmlCode(blockId);
           console.log(xmlCode)
-          // TODO:
-          //  Now we send it over to the API for translation!
+          translateToMist(xmlCode, false)
         }
       }
     });
+    blocklyRegistered = true
+  }
+}
+
+function generateMistAll() {
+  const allBlockXMLs = (window as any).Blockly?.getMainWorkspace()
+    .getTopBlocks()
+    .filter((block: any) => FILTER_BLOCKS.indexOf(block.type) > -1)
+    .map((block: any) => block.id);
+  translateToMist(getManyXmlCodes(allBlockXMLs), true)
+}
+
+async function translateToMist(xmlContent: string, manyBlocks: boolean) {
+  try {
+    const response = await fetch(MIST_ENDPOINT + manyBlocks, {
+      method: 'POST',
+      headers: {"Content-Type": "text/plain"},
+      body: xmlContent,
+    })
+    const mistCode = await response.text()
+    console.log(mistCode)
+
+    const mistFrame = document.getElementById("mistFrame") as HTMLIFrameElement | null
+    if (mistFrame == null) {
+      console.log("Mist frame is null!")
+    } else {
+      mistFrame.contentWindow?.postMessage(mistCode, '*')
+    }
+  } catch (error) {
+    console.log(error)
   }
 }
 
@@ -159,3 +203,6 @@ const intervalId = setInterval(() => {
   }
 }, 1700)
 
+window.addEventListener('hashchange', (event) => {
+  monitorBlockly()
+});
