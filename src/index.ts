@@ -85,13 +85,14 @@ function addCodeSpace() {
   button.classList.add("ode-TextButton")
   button.id = "mistRun"
   button.innerText = "Run Code"
+  button.style.marginBottom = "20px"
 
   button.addEventListener("click", () => {
     (window as any).main.mist(editorCode)
   })
 
-  content.appendChild(button)
   content.appendChild(header)
+  content.appendChild(button)
 
   // the code editor!
   const frame = document.createElement("iframe")
@@ -228,6 +229,7 @@ function mistOutput(output: any) {
   if (mistFrame == null) {
     console.log("Mist frame is null!")
   } else {
+    console.log("Mist output: " + output)
     mistFrame.contentWindow?.postMessage({type: "mistResult", value: output}, '*')
   }
 }

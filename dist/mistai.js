@@ -18,6 +18,7 @@ const MIST_ENDPOINT = "http://localhost:2103/mist";
 const FRAME_URL = "https://mist-playground.vercel.app/";
 const MIST_JS = "https://cdn.jsdelivr.net/gh/XomaDev/compiled-bins/mist.js";
 const FILTER_BLOCKS = ["component_event", "global_declaration", "procedures_defreturn", "procedures_defnoreturn"];
+let editorCode = "";
 let codeSpaceShown = false;
 let resizing = false; // user is resizing code editor
 let blocklyRegistered = false;
@@ -76,7 +77,17 @@ function addCodeSpace() {
     caption.classList.add("ode-Box-header-caption");
     caption.innerText = "Mist";
     header.appendChild(caption);
+    // run button
+    const button = document.createElement("div");
+    button.classList.add("ode-TextButton");
+    button.id = "mistRun";
+    button.innerText = "Run Code";
+    button.style.marginBottom = "20px";
+    button.addEventListener("click", () => {
+        window.main.mist(editorCode);
+    });
     content.appendChild(header);
+    content.appendChild(button);
     // the code editor!
     const frame = document.createElement("iframe");
     frame.id = "mistFrame";
@@ -117,6 +128,8 @@ function doResize(e) {
         newPercent = Math.min(Math.max(newPercent, 10), 90);
         codeSpace.style.width = `${newPercent}%`;
     }
+}
+function registerListeners() {
 }
 // == END UI ==
 // == START BLOCKLY CODE ==
@@ -185,6 +198,7 @@ function translateToMist(xmlContent) {
                 console.log("Mist frame is null!");
             }
             else {
+                editorCode = mistCode;
                 (_a = mistFrame.contentWindow) === null || _a === void 0 ? void 0 : _a.postMessage({ type: "mistCode", value: mistCode }, '*');
             }
         }
@@ -197,7 +211,16 @@ function translateToMist(xmlContent) {
  * Called by Mist JS
  */
 function mistOutput(output) {
+    var _a;
     console.log(output);
+    const mistFrame = document.getElementById("mistFrame");
+    if (mistFrame == null) {
+        console.log("Mist frame is null!");
+    }
+    else {
+        console.log("Mist output: " + output);
+        (_a = mistFrame.contentWindow) === null || _a === void 0 ? void 0 : _a.postMessage({ type: "mistResult", value: output }, '*');
+    }
 }
 // == END BLOCKLY CODE ==
 // == BEGIN PRELOAD
