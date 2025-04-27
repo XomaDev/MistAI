@@ -21,7 +21,7 @@ const FILTER_BLOCKS = ["component_event", "global_declaration", "procedures_defr
 let codeSpaceShown = false;
 let resizing = false; // user is resizing code editor
 let blocklyRegistered = false;
-let selectedBlockIds = [];
+let selectedBlockIds = new Set();
 // == BEGIN UI ==
 function addMistButton() {
     const button = document.createElement("div");
@@ -144,12 +144,12 @@ function monitorBlockly() {
             const blockId = event.newElementId;
             if (event.type == window.Blockly.Events.SELECTED) {
                 if (blockId != null) {
-                    selectedBlockIds.push(blockId);
-                    translateToMist(getManyXmlCodes(selectedBlockIds));
+                    selectedBlockIds.add(blockId);
+                    translateToMist(getManyXmlCodes(Array.from(selectedBlockIds)));
                     return;
                 }
                 else {
-                    selectedBlockIds = [];
+                    selectedBlockIds = new Set();
                     console.log("Unselected!");
                     generateMistAll();
                 }
@@ -185,7 +185,7 @@ function translateToMist(xmlContent) {
                 console.log("Mist frame is null!");
             }
             else {
-                (_a = mistFrame.contentWindow) === null || _a === void 0 ? void 0 : _a.postMessage(mistCode, '*');
+                (_a = mistFrame.contentWindow) === null || _a === void 0 ? void 0 : _a.postMessage({ type: "mistCode", value: mistCode }, '*');
             }
         }
         catch (error) {

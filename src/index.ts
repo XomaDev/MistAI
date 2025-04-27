@@ -12,6 +12,7 @@ const MIST_JS = "https://cdn.jsdelivr.net/gh/XomaDev/compiled-bins/mist.js"
 
 const FILTER_BLOCKS = ["component_event", "global_declaration", "procedures_defreturn", "procedures_defnoreturn"]
 
+let editorCode = ""
 let codeSpaceShown = false
 let resizing = false // user is resizing code editor
 let blocklyRegistered = false
@@ -79,6 +80,17 @@ function addCodeSpace() {
   caption.innerText = "Mist"
   header.appendChild(caption)
 
+  // run button
+  const button = document.createElement("div")
+  button.classList.add("ode-TextButton")
+  button.id = "mistRun"
+  button.innerText = "Run Code"
+
+  button.addEventListener("click", () => {
+    (window as any).main.mist(editorCode)
+  })
+
+  content.appendChild(button)
   content.appendChild(header)
 
   // the code editor!
@@ -125,6 +137,10 @@ function doResize(e: MouseEvent) {
     newPercent = Math.min(Math.max(newPercent, 10), 90);
     codeSpace.style.width = `${newPercent}%`;
   }
+}
+
+function registerListeners() {
+
 }
 
 // == END UI ==
@@ -195,7 +211,8 @@ async function translateToMist(xmlContent: string) {
     if (mistFrame == null) {
       console.log("Mist frame is null!")
     } else {
-      mistFrame.contentWindow?.postMessage(mistCode, '*')
+      editorCode = mistCode
+      mistFrame.contentWindow?.postMessage({type: "mistCode", value: mistCode}, '*')
     }
   } catch (error) {
     console.log(error)
@@ -207,6 +224,12 @@ async function translateToMist(xmlContent: string) {
  */
 function mistOutput(output: any) {
   console.log(output)
+  const mistFrame = document.getElementById("mistFrame") as HTMLIFrameElement | null
+  if (mistFrame == null) {
+    console.log("Mist frame is null!")
+  } else {
+    mistFrame.contentWindow?.postMessage({type: "mistResult", value: output}, '*')
+  }
 }
 
 // == END BLOCKLY CODE ==
