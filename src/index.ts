@@ -140,21 +140,11 @@ function doResize(e: MouseEvent) {
   }
 }
 
-function registerListeners() {
-
-}
-
 // == END UI ==
 // == START BLOCKLY CODE ==
 
 function getBlock(blockId: string) {
   return (window as any).Blockly?.getMainWorkspace()?.getBlockById(blockId);
-}
-
-function getXmlCode(blockId: string) {
-  const xml = document.createElement('xml');
-  xml.appendChild((window as any).Blockly.Xml.blockToDom(getBlock(blockId), true));
-  return (window as any).Blockly.Xml.domToText(xml);
 }
 
 function getManyXmlCodes(blockIds: string[]) {
