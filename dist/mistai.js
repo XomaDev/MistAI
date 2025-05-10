@@ -14,15 +14,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 console.log('Happy developing ✨');
-const MIST_ENDPOINT = "http://localhost:2103/mist";
 const FRAME_URL = "https://mist-playground.vercel.app/";
-const MIST_JS = "https://cdn.jsdelivr.net/gh/XomaDev/compiled-bins/mist-x.js";
+const WASM_EXEC = "http://localhost:8000/wasm_exec.js";
 const FILTER_BLOCKS = ["component_event", "global_declaration", "procedures_defreturn", "procedures_defnoreturn"];
 let editorCode = "";
 let codeSpaceShown = false;
 let resizing = false; // user is resizing code editor
 let blocklyRegistered = false;
 let selectedBlockIds = new Set();
+// == wasam.go
 // == BEGIN UI ==
 function addMistButton() {
     const button = document.createElement("div");
@@ -129,18 +129,11 @@ function doResize(e) {
         codeSpace.style.width = `${newPercent}%`;
     }
 }
-function registerListeners() {
-}
 // == END UI ==
 // == START BLOCKLY CODE ==
 function getBlock(blockId) {
     var _a, _b;
     return (_b = (_a = window.Blockly) === null || _a === void 0 ? void 0 : _a.getMainWorkspace()) === null || _b === void 0 ? void 0 : _b.getBlockById(blockId);
-}
-function getXmlCode(blockId) {
-    const xml = document.createElement('xml');
-    xml.appendChild(window.Blockly.Xml.blockToDom(getBlock(blockId), true));
-    return window.Blockly.Xml.domToText(xml);
 }
 function getManyXmlCodes(blockIds) {
     const xml = document.createElement('xml');
@@ -154,25 +147,7 @@ function monitorBlockly() {
     const workspace = (_b = (_a = window.Blockly) === null || _a === void 0 ? void 0 : _a.getMainWorkspace) === null || _b === void 0 ? void 0 : _b.call(_a);
     if (workspace) {
         workspace.addChangeListener((event) => {
-            const blockId = event.newElementId;
-            if (event.type == window.Blockly.Events.SELECTED) {
-                if (blockId != null) {
-                    selectedBlockIds.add(blockId);
-                    translateToMist(getManyXmlCodes(Array.from(selectedBlockIds)));
-                    return;
-                }
-                else {
-                    selectedBlockIds = new Set();
-                    console.log("Unselected!");
-                    generateMistAll();
-                }
-            }
-            else if (event.type == "screen.switch") {
-                generateMistAll();
-            }
-            else {
-                console.log("Event Not Handled: " + event.type);
-            }
+            generateMistAll();
         });
         blocklyRegistered = true;
     }
@@ -183,53 +158,50 @@ function generateMistAll() {
     translateToMist(getManyXmlCodes(allXmlBlockIds));
 }
 function translateToMist(xmlContent) {
-    return __awaiter(this, void 0, void 0, function* () {
-        var _a;
-        try {
-            const response = yield fetch(MIST_ENDPOINT, {
-                method: 'POST',
-                headers: { "Content-Type": "text/plain" },
-                body: xmlContent,
-            });
-            const mistCode = yield response.text();
-            console.log(mistCode);
-            const mistFrame = document.getElementById("mistFrame");
-            if (mistFrame == null) {
-                console.log("Mist frame is null!");
-            }
-            else {
-                editorCode = mistCode;
-                (_a = mistFrame.contentWindow) === null || _a === void 0 ? void 0 : _a.postMessage({ type: "mistCode", value: mistCode }, '*');
-            }
-        }
-        catch (error) {
-            console.log(error);
-        }
-    });
-}
-/**
- * Called by Mist JS
- */
-function mistOutput(output) {
     var _a;
-    console.log(output);
-    const mistFrame = document.getElementById("mistFrame");
-    if (mistFrame == null) {
-        console.log("Mist frame is null!");
+    try {
+        const mistCode = xmlToMist(xmlContent);
+        console.log(mistCode);
+        const mistFrame = document.getElementById("mistFrame");
+        if (mistFrame == null) {
+            console.log("Mist frame is null!");
+        }
+        else {
+            editorCode = mistCode;
+            (_a = mistFrame.contentWindow) === null || _a === void 0 ? void 0 : _a.postMessage({ type: "mistCode", value: mistCode }, '*');
+        }
     }
-    else {
-        console.log("Mist output: " + output);
-        (_a = mistFrame.contentWindow) === null || _a === void 0 ? void 0 : _a.postMessage({ type: "mistResult", value: output }, '*');
+    catch (error) {
+        console.log(error);
     }
+}
+function loadWasm() {
+    if (!WebAssembly.instantiateStreaming) { // polyfill
+        WebAssembly.instantiateStreaming = (resp, importObject) => __awaiter(this, void 0, void 0, function* () {
+            const source = yield (yield resp).arrayBuffer();
+            return yield WebAssembly.instantiate(source, importObject);
+        });
+    }
+    const go = new Go();
+    let mod, inst;
+    WebAssembly.instantiateStreaming(fetch("http://localhost:8000/main.wasm"), go.importObject).then((result) => {
+        mod = result.module;
+        inst = result.instance;
+        console.clear();
+        go.run(inst);
+        inst = WebAssembly.instantiate(mod, go.importObject);
+    }).catch((err) => {
+        console.error(err);
+    });
 }
 // == END BLOCKLY CODE ==
 // == BEGIN PRELOAD
 const script = document.createElement("script");
-script.src = MIST_JS;
+script.src = WASM_EXEC;
 script.async = true;
 script.onload = (e) => {
     console.log("Mist JS was Loaded!");
-    window.main(); // starts Mist JS
+    loadWasm();
 };
 document.head.appendChild(script);
 // == END PRELOAD

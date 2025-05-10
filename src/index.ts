@@ -6,9 +6,8 @@
 
 console.log('Happy developing ✨')
 
-const MIST_ENDPOINT = "http://localhost:2103/mist"
 const FRAME_URL = "https://mist-playground.vercel.app/"
-const MIST_JS = "https://cdn.jsdelivr.net/gh/XomaDev/compiled-bins/mist-x.js"
+const WASM_EXEC = "http://localhost:8000/wasm_exec.js"
 
 const FILTER_BLOCKS = ["component_event", "global_declaration", "procedures_defreturn", "procedures_defnoreturn"]
 
@@ -18,6 +17,11 @@ let resizing = false // user is resizing code editor
 let blocklyRegistered = false
 
 let selectedBlockIds: Set<string> = new Set();
+
+// == wasam.go ==
+declare var Go: any;
+declare function xmlToMist(xmlContent: string): string;
+// == wasam.go
 
 // == BEGIN UI ==
 function addMistButton() {
@@ -159,22 +163,7 @@ function monitorBlockly() {
   const workspace = (window as any).Blockly?.getMainWorkspace?.();
   if (workspace) {
     workspace.addChangeListener((event: any) => {
-      const blockId = event.newElementId
-      if (event.type == (window as any).Blockly.Events.SELECTED) {
-        if (blockId != null) {
-          selectedBlockIds.add(blockId)
-          translateToMist(getManyXmlCodes(Array.from(selectedBlockIds)))
-          return;
-        } else {
-          selectedBlockIds = new Set()
-          console.log("Unselected!")
-          generateMistAll()
-        }
-      } else if (event.type == "screen.switch") {
-        generateMistAll()
-      } else {
-        console.log("Event Not Handled: " + event.type)
-      }
+      generateMistAll()
     });
     blocklyRegistered = true
   }
@@ -188,14 +177,9 @@ function generateMistAll() {
   translateToMist(getManyXmlCodes(allXmlBlockIds))
 }
 
-async function translateToMist(xmlContent: string) {
+function translateToMist(xmlContent: string) {
   try {
-    const response = await fetch(MIST_ENDPOINT, {
-      method: 'POST',
-      headers: {"Content-Type": "text/plain"},
-      body: xmlContent,
-    })
-    const mistCode = await response.text()
+    const mistCode = xmlToMist(xmlContent)
     console.log(mistCode)
 
     const mistFrame = document.getElementById("mistFrame") as HTMLIFrameElement | null
@@ -210,29 +194,37 @@ async function translateToMist(xmlContent: string) {
   }
 }
 
-/**
- * Called by Mist JS
- */
-function mistOutput(output: any) {
-  console.log(output)
-  const mistFrame = document.getElementById("mistFrame") as HTMLIFrameElement | null
-  if (mistFrame == null) {
-    console.log("Mist frame is null!")
-  } else {
-    console.log("Mist output: " + output)
-    mistFrame.contentWindow?.postMessage({type: "mistResult", value: output}, '*')
+function loadWasm() {
+  if (!WebAssembly.instantiateStreaming) { // polyfill
+    WebAssembly.instantiateStreaming = async (resp, importObject) => {
+      const source = await (await resp).arrayBuffer();
+      return await WebAssembly.instantiate(source, importObject);
+    };
   }
+
+  const go = new Go();
+  let mod, inst;
+  WebAssembly.instantiateStreaming(fetch("http://localhost:8000/main.wasm"), go.importObject).then((result) => {
+    mod = result.module;
+    inst = result.instance;
+
+    console.clear()
+    go.run(inst);
+    inst = WebAssembly.instantiate(mod, go.importObject);
+  }).catch((err) => {
+    console.error(err);
+  });
 }
 
 // == END BLOCKLY CODE ==
 
 // == BEGIN PRELOAD
 const script = document.createElement("script");
-script.src = MIST_JS
+script.src = WASM_EXEC
 script.async = true
 script.onload = (e) => {
   console.log("Mist JS was Loaded!");
-  (window as any).main() // starts Mist JS
+  loadWasm()
 }
 document.head.appendChild(script)
 // == END PRELOAD
