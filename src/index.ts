@@ -16,11 +16,12 @@ let codeSpaceShown = false
 let resizing = false // user is resizing code editor
 let blocklyRegistered = false
 
-let selectedBlockIds: Set<string> = new Set();
+let skipBlockChanges = false
 
 // == wasam.go ==
 declare var Go: any;
 declare function xmlToMist(xmlContent: string): string;
+declare function mistToXml(mistCode: string): string;
 // == wasam.go
 
 // == BEGIN UI ==
@@ -85,18 +86,18 @@ function addCodeSpace() {
   header.appendChild(caption)
 
   // run button
-  const button = document.createElement("div")
-  button.classList.add("ode-TextButton")
-  button.id = "mistRun"
-  button.innerText = "Run Code"
-  button.style.marginBottom = "20px"
-
-  button.addEventListener("click", () => {
-    (window as any).main.mist(editorCode)
-  })
+  // const button = document.createElement("div")
+  // button.classList.add("ode-TextButton")
+  // button.id = "mistRun"
+  // button.innerText = "Run Code"
+  // button.style.marginBottom = "20px"
+  //
+  // button.addEventListener("click", () => {
+  //   (window as any).main.mist(editorCode)
+  // })
 
   content.appendChild(header)
-  content.appendChild(button)
+  //content.appendChild(button)
 
   // the code editor!
   const frame = document.createElement("iframe")
@@ -163,7 +164,13 @@ function monitorBlockly() {
   const workspace = (window as any).Blockly?.getMainWorkspace?.();
   if (workspace) {
     workspace.addChangeListener((event: any) => {
-      generateMistAll()
+      console.log("Blockly event " + event.type)
+      if (!skipBlockChanges) {
+        generateMistAll()
+      }
+      if (event.type == "blocks.arrange.end") {
+        skipBlockChanges = false
+      }
     });
     blocklyRegistered = true
   }
@@ -177,9 +184,10 @@ function generateMistAll() {
   translateToMist(getManyXmlCodes(allXmlBlockIds))
 }
 
+// Blocks -> Mist
 function translateToMist(xmlContent: string) {
   try {
-    const mistCode = xmlToMist(xmlContent)
+    const mistCode = xmlToMist(xmlContent).trim()
     console.log(mistCode)
 
     const mistFrame = document.getElementById("mistFrame") as HTMLIFrameElement | null
@@ -194,6 +202,57 @@ function translateToMist(xmlContent: string) {
   }
 }
 
+// Mist -> XML
+function translateToBlocks(mistCode: string) {
+  try {
+    const xmlCode = mistToXml(mistCode)
+    console.log("Generated XML Code:", xmlCode)
+    renderBlocks(xmlCode)
+    skipBlockChanges = true
+  } catch (error) {
+    console.log(error)
+  }
+}
+
+function renderBlocks(xmlGenerated: string) {
+  // First clear the existing workspace, and inject the new blocks
+  const xmlStrings = xmlGenerated.split("\u0000");
+  const workspace = (window as any).Blockly?.getMainWorkspace();
+  workspace.clear()
+
+  const blocks = [];
+
+  for (let i = 0; i < xmlStrings.length; i++) {
+    const xmlString = xmlStrings[i].trim();
+    if (!xmlString || xmlString.replace(/\0/g, '').trim() === '') {
+      continue;
+    }
+
+    console.log(xmlString);
+    const xml = (window as any).Blockly?.utils.xml.textToDom(xmlString);
+    const xmlBlock = xml.firstElementChild;
+    const block = (window as any).Blockly?.Xml.domToBlock(xmlBlock, workspace);
+    block.initSvg(); // Init all blocks first
+    blocks.push(block); // Save for rendering later
+  }
+
+  for (const block of blocks) {
+    workspace.requestRender(block);
+  }
+
+  // Sort all the blocks in order
+  const item = (window as any).Blockly?.ContextMenuRegistry.registry.getItem("appinventor_arrange_vertical");
+
+  if (item && typeof item.callback === "function") {
+    const workspace = (window as any).Blockly?.getMainWorkspace();
+
+    const fakeScope = {workspace: workspace,};
+    item.callback(fakeScope, null);
+  } else {
+    console.error("Callback not found or item is invalid");
+  }
+}
+
 function loadWasm() {
   if (!WebAssembly.instantiateStreaming) { // polyfill
     WebAssembly.instantiateStreaming = async (resp, importObject) => {
@@ -204,7 +263,7 @@ function loadWasm() {
 
   const go = new Go();
   let mod, inst;
-  WebAssembly.instantiateStreaming(fetch("http://localhost:8000/main.wasm"), go.importObject).then((result) => {
+  WebAssembly.instantiateStreaming(fetch("http://localhost:8000/falcon.wasm"), go.importObject).then((result) => {
     mod = result.module;
     inst = result.instance;
 
@@ -242,3 +301,9 @@ const intervalId = setInterval(() => {
 window.addEventListener('hashchange', (event) => {
   monitorBlockly()
 });
+
+// Listen for code editor changes
+window.addEventListener("message", (event) => {
+  // Perform Mist -> XML conversion
+  translateToBlocks(event.data.text)
+})

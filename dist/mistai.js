@@ -21,7 +21,7 @@ let editorCode = "";
 let codeSpaceShown = false;
 let resizing = false; // user is resizing code editor
 let blocklyRegistered = false;
-let selectedBlockIds = new Set();
+let skipBlockChanges = false;
 // == wasam.go
 // == BEGIN UI ==
 function addMistButton() {
@@ -78,16 +78,17 @@ function addCodeSpace() {
     caption.innerText = "Mist";
     header.appendChild(caption);
     // run button
-    const button = document.createElement("div");
-    button.classList.add("ode-TextButton");
-    button.id = "mistRun";
-    button.innerText = "Run Code";
-    button.style.marginBottom = "20px";
-    button.addEventListener("click", () => {
-        window.main.mist(editorCode);
-    });
+    // const button = document.createElement("div")
+    // button.classList.add("ode-TextButton")
+    // button.id = "mistRun"
+    // button.innerText = "Run Code"
+    // button.style.marginBottom = "20px"
+    //
+    // button.addEventListener("click", () => {
+    //   (window as any).main.mist(editorCode)
+    // })
     content.appendChild(header);
-    content.appendChild(button);
+    //content.appendChild(button)
     // the code editor!
     const frame = document.createElement("iframe");
     frame.id = "mistFrame";
@@ -147,7 +148,13 @@ function monitorBlockly() {
     const workspace = (_b = (_a = window.Blockly) === null || _a === void 0 ? void 0 : _a.getMainWorkspace) === null || _b === void 0 ? void 0 : _b.call(_a);
     if (workspace) {
         workspace.addChangeListener((event) => {
-            generateMistAll();
+            console.log("Blockly event " + event.type);
+            if (!skipBlockChanges) {
+                generateMistAll();
+            }
+            if (event.type == "blocks.arrange.end") {
+                skipBlockChanges = false;
+            }
         });
         blocklyRegistered = true;
     }
@@ -157,10 +164,11 @@ function generateMistAll() {
     const allXmlBlockIds = (_a = window.Blockly) === null || _a === void 0 ? void 0 : _a.getMainWorkspace().getTopBlocks().filter((block) => FILTER_BLOCKS.indexOf(block.type) > -1).map((block) => block.id);
     translateToMist(getManyXmlCodes(allXmlBlockIds));
 }
+// Blocks -> Mist
 function translateToMist(xmlContent) {
     var _a;
     try {
-        const mistCode = xmlToMist(xmlContent);
+        const mistCode = xmlToMist(xmlContent).trim();
         console.log(mistCode);
         const mistFrame = document.getElementById("mistFrame");
         if (mistFrame == null) {
@@ -175,6 +183,51 @@ function translateToMist(xmlContent) {
         console.log(error);
     }
 }
+// Mist -> XML
+function translateToBlocks(mistCode) {
+    try {
+        const xmlCode = mistToXml(mistCode);
+        console.log("Generated XML Code:", xmlCode);
+        renderBlocks(xmlCode);
+        skipBlockChanges = true;
+    }
+    catch (error) {
+        console.log(error);
+    }
+}
+function renderBlocks(xmlGenerated) {
+    var _a, _b, _c, _d, _e;
+    // First clear the existing workspace, and inject the new blocks
+    const xmlStrings = xmlGenerated.split("\u0000");
+    const workspace = (_a = window.Blockly) === null || _a === void 0 ? void 0 : _a.getMainWorkspace();
+    workspace.clear();
+    const blocks = [];
+    for (let i = 0; i < xmlStrings.length; i++) {
+        const xmlString = xmlStrings[i].trim();
+        if (!xmlString || xmlString.replace(/\0/g, '').trim() === '') {
+            continue;
+        }
+        console.log(xmlString);
+        const xml = (_b = window.Blockly) === null || _b === void 0 ? void 0 : _b.utils.xml.textToDom(xmlString);
+        const xmlBlock = xml.firstElementChild;
+        const block = (_c = window.Blockly) === null || _c === void 0 ? void 0 : _c.Xml.domToBlock(xmlBlock, workspace);
+        block.initSvg(); // Init all blocks first
+        blocks.push(block); // Save for rendering later
+    }
+    for (const block of blocks) {
+        workspace.requestRender(block);
+    }
+    // Sort all the blocks in order
+    const item = (_d = window.Blockly) === null || _d === void 0 ? void 0 : _d.ContextMenuRegistry.registry.getItem("appinventor_arrange_vertical");
+    if (item && typeof item.callback === "function") {
+        const workspace = (_e = window.Blockly) === null || _e === void 0 ? void 0 : _e.getMainWorkspace();
+        const fakeScope = { workspace: workspace, };
+        item.callback(fakeScope, null);
+    }
+    else {
+        console.error("Callback not found or item is invalid");
+    }
+}
 function loadWasm() {
     if (!WebAssembly.instantiateStreaming) { // polyfill
         WebAssembly.instantiateStreaming = (resp, importObject) => __awaiter(this, void 0, void 0, function* () {
@@ -184,7 +237,7 @@ function loadWasm() {
     }
     const go = new Go();
     let mod, inst;
-    WebAssembly.instantiateStreaming(fetch("http://localhost:8000/main.wasm"), go.importObject).then((result) => {
+    WebAssembly.instantiateStreaming(fetch("http://localhost:8000/falcon.wasm"), go.importObject).then((result) => {
         mod = result.module;
         inst = result.instance;
         console.clear();
@@ -216,4 +269,9 @@ const intervalId = setInterval(() => {
 }, 1700);
 window.addEventListener('hashchange', (event) => {
     monitorBlockly();
+});
+// Listen for code editor changes
+window.addEventListener("message", (event) => {
+    // Perform Mist -> XML conversion
+    translateToBlocks(event.data.text);
 });
