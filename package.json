@@ -4,10 +4,10 @@
   "description": "",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc && esbuild build/index.js --bundle --platform=browser --outfile=dist/mistai.js"
   },
-  "dependencies": {},
   "devDependencies": {
+    "esbuild": "^0.25.9",
     "typescript": "^5.5.3"
   },
   "private": true
