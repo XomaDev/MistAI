@@ -149,13 +149,17 @@
       if (mistFrame == null) {
         console.log("Mist frame is null!");
       } else {
-        (_a = mistFrame.contentWindow) === null || _a === void 0 ? void 0 : _a.postMessage({ type: "mistCode", value: mistCode }, "*");
+        const mergedCode = mergeSyntaxDiff(currentEditorCode, mistCode);
+        console.log("MergedCode: ", mergedCode);
+        (_a = mistFrame.contentWindow) === null || _a === void 0 ? void 0 : _a.postMessage({ type: "mistCode", value: mergedCode }, "*");
+        currentEditorCode = mergedCode;
       }
     } catch (error) {
       console.log(error);
     }
   }
   function translateToBlocks(mistCode) {
+    currentEditorCode = mistCode;
     try {
       const xmlCode = mistToXml(mistCode);
       console.log("Generated XML Code:", xmlCode);
@@ -195,12 +199,16 @@
       console.error("Callback not found or item is invalid");
     }
   }
-  var FILTER_BLOCKS, skipBlockChanges;
+  var FILTER_BLOCKS, skipBlockChanges, currentEditorCode;
   var init_cat_blockly = __esm({
     "build/cat_blockly.js"() {
       "use strict";
       FILTER_BLOCKS = ["component_event", "global_declaration", "procedures_defreturn", "procedures_defnoreturn"];
       skipBlockChanges = false;
+      currentEditorCode = "";
+      window.addEventListener("message", (event) => {
+        translateToBlocks(event.data.text);
+      });
     }
   });
 
@@ -275,9 +283,6 @@
       }, 1700);
       window.addEventListener("hashchange", (event) => {
         monitorBlockly();
-      });
-      window.addEventListener("message", (event) => {
-        translateToBlocks(event.data.text);
       });
     }
   });
