@@ -5,7 +5,7 @@
 // ==/UserScript==
 
 import {addCodeSpace, addMistButton} from "./cat_frame";
-import {monitorBlockly, translateToBlocks} from "./cat_blockly";
+import {monitorBlockly} from "./cat_blockly";
 
 console.log('Happy developing ✨')
 
@@ -61,9 +61,3 @@ const intervalId = setInterval(() => {
 window.addEventListener('hashchange', (event) => {
   monitorBlockly()
 });
-
-// Listen for code editor changes
-window.addEventListener("message", (event) => {
-  // Perform Mist -> XML conversion
-  translateToBlocks(event.data.text)
-})

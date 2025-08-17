@@ -1,9 +1,11 @@
 const FILTER_BLOCKS = ["component_event", "global_declaration", "procedures_defreturn", "procedures_defnoreturn"]
 export let skipBlockChanges = false
+let currentEditorCode = ""
 
 // == falcon.go ==
 declare function xmlToMist(xmlContent: string): string;
 declare function mistToXml(mistCode: string): string;
+declare function mergeSyntaxDiff(humanCode: string, machineCode: string): string;
 // == falcon.go ==
 
 function getBlock(blockId: string) {
@@ -51,7 +53,10 @@ function translateToMist(xmlContent: string) {
         if (mistFrame == null) {
             console.log("Mist frame is null!")
         } else {
-            mistFrame.contentWindow?.postMessage({type: "mistCode", value: mistCode}, '*')
+            const mergedCode = mergeSyntaxDiff(currentEditorCode, mistCode)
+            console.log("MergedCode: ", mergedCode)
+            mistFrame.contentWindow?.postMessage({type: "mistCode", value: mergedCode}, '*')
+            currentEditorCode = mergedCode
         }
     } catch (error) {
         console.log(error)
@@ -59,7 +64,8 @@ function translateToMist(xmlContent: string) {
 }
 
 // Mist -> XML
-export function translateToBlocks(mistCode: string) {
+function translateToBlocks(mistCode: string) {
+    currentEditorCode = mistCode
     try {
         const xmlCode = mistToXml(mistCode)
         console.log("Generated XML Code:", xmlCode)
@@ -108,3 +114,9 @@ function renderBlocks(xmlGenerated: string) {
         console.error("Callback not found or item is invalid");
     }
 }
+
+// Listen for code editor changes
+window.addEventListener("message", (event) => {
+    // Perform Mist -> XML conversion
+    translateToBlocks(event.data.text)
+})
