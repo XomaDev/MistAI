@@ -1,14 +1,9 @@
 "use strict";
 (() => {
-  var __getOwnPropNames = Object.getOwnPropertyNames;
-  var __esm = (fn, res) => function __init() {
-    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
-  };
-  var __commonJS = (cb, mod) => function __require() {
-    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
-  };
-
   // build/cat_frame.js
+  var FRAME_URL = "https://mist-playground.vercel.app/";
+  var codeSpaceShown = false;
+  var resizing = false;
   function addMistButton() {
     const button = document.createElement("div");
     button.classList.add("ode-TextButton");
@@ -98,17 +93,11 @@
       codeSpace.style.width = `${newPercent}%`;
     }
   }
-  var FRAME_URL, codeSpaceShown, resizing;
-  var init_cat_frame = __esm({
-    "build/cat_frame.js"() {
-      "use strict";
-      FRAME_URL = "https://mist-playground.vercel.app/";
-      codeSpaceShown = false;
-      resizing = false;
-    }
-  });
 
   // build/cat_blockly.js
+  var FILTER_BLOCKS = ["component_event", "global_declaration", "procedures_defreturn", "procedures_defnoreturn"];
+  var skipBlockChanges = false;
+  var currentEditorCode = "";
   function getBlock(blockId) {
     var _a, _b;
     return (_b = (_a = window.Blockly) === null || _a === void 0 ? void 0 : _a.getMainWorkspace()) === null || _b === void 0 ? void 0 : _b.getBlockById(blockId);
@@ -138,30 +127,52 @@
   function generateMistAll() {
     var _a;
     const allXmlBlockIds = (_a = window.Blockly) === null || _a === void 0 ? void 0 : _a.getMainWorkspace().getTopBlocks().filter((block) => FILTER_BLOCKS.indexOf(block.type) > -1).map((block) => block.id);
-    translateToMist(getManyXmlCodes(allXmlBlockIds));
+    if (allXmlBlockIds.length > 0) {
+      translateToMist(getManyXmlCodes(allXmlBlockIds));
+    }
   }
   function translateToMist(xmlContent) {
-    var _a;
+    var _a, _b;
     try {
       const mistCode = xmlToMist(xmlContent).trim();
       console.log(mistCode);
       const mistFrame = document.getElementById("mistFrame");
       if (mistFrame == null) {
         console.log("Mist frame is null!");
-      } else {
+      } else if (currentEditorCode != null) {
         const mergedCode = mergeSyntaxDiff(currentEditorCode, mistCode);
-        console.log("MergedCode: ", mergedCode);
         (_a = mistFrame.contentWindow) === null || _a === void 0 ? void 0 : _a.postMessage({ type: "mistCode", value: mergedCode }, "*");
         currentEditorCode = mergedCode;
+      } else {
+        (_b = mistFrame.contentWindow) === null || _b === void 0 ? void 0 : _b.postMessage({ type: "mistCode", value: mistCode }, "*");
       }
     } catch (error) {
       console.log(error);
     }
   }
+  function getComponentDefinitions() {
+    var _a, _b, _c, _d, _e, _f;
+    (_c = (_b = (_a = AI === null || AI === void 0 ? void 0 : AI.Blockly) === null || _a === void 0 ? void 0 : _a.TypeBlock) === null || _b === void 0 ? void 0 : _b.prototype) === null || _c === void 0 ? void 0 : _c.generateOptions();
+    const tbOptions = (_f = (_e = (_d = AI === null || AI === void 0 ? void 0 : AI.Blockly) === null || _d === void 0 ? void 0 : _d.TypeBlock) === null || _e === void 0 ? void 0 : _e.prototype) === null || _f === void 0 ? void 0 : _f.TBOptions_;
+    const componentMap = {};
+    if (!tbOptions) {
+      return componentMap;
+    }
+    Object.values(tbOptions).filter((value) => value.canonicName === "component_component_block" && value.mutatorAttributes).forEach((value) => {
+      const mutator = value.mutatorAttributes;
+      const componentType = mutator.component_type;
+      const instanceName = mutator.instance_name;
+      if (!componentMap[componentType]) {
+        componentMap[componentType] = [];
+      }
+      componentMap[componentType].push(instanceName);
+    });
+    return componentMap;
+  }
   function translateToBlocks(mistCode) {
     currentEditorCode = mistCode;
     try {
-      const xmlCode = mistToXml(mistCode);
+      const xmlCode = mistToXml(mistCode, getComponentDefinitions());
       console.log("Generated XML Code:", xmlCode);
       renderBlocks(xmlCode);
       skipBlockChanges = true;
@@ -199,92 +210,51 @@
       console.error("Callback not found or item is invalid");
     }
   }
-  var FILTER_BLOCKS, skipBlockChanges, currentEditorCode;
-  var init_cat_blockly = __esm({
-    "build/cat_blockly.js"() {
-      "use strict";
-      FILTER_BLOCKS = ["component_event", "global_declaration", "procedures_defreturn", "procedures_defnoreturn"];
-      skipBlockChanges = false;
-      currentEditorCode = "";
-      window.addEventListener("message", (event) => {
-        translateToBlocks(event.data.text);
-      });
-    }
+  window.addEventListener("message", (event) => {
+    translateToBlocks(event.data.text);
   });
 
   // build/index.js
-  var require_index = __commonJS({
-    "build/index.js"(exports) {
-      init_cat_frame();
-      init_cat_blockly();
-      var __awaiter = exports && exports.__awaiter || function(thisArg, _arguments, P, generator) {
-        function adopt(value) {
-          return value instanceof P ? value : new P(function(resolve) {
-            resolve(value);
-          });
-        }
-        return new (P || (P = Promise))(function(resolve, reject) {
-          function fulfilled(value) {
-            try {
-              step(generator.next(value));
-            } catch (e) {
-              reject(e);
-            }
-          }
-          function rejected(value) {
-            try {
-              step(generator["throw"](value));
-            } catch (e) {
-              reject(e);
-            }
-          }
-          function step(result) {
-            result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
-          }
-          step((generator = generator.apply(thisArg, _arguments || [])).next());
-        });
+  console.log("Happy developing \u2728");
+  var WASM_EXEC = "static/js/wasm_exec.js";
+  var WASM_FILE = "static/wasm/falcon.wasm";
+  function loadWasm() {
+    if (!WebAssembly.instantiateStreaming) {
+      WebAssembly.instantiateStreaming = async (resp, importObject) => {
+        const source = await (await resp).arrayBuffer();
+        return await WebAssembly.instantiate(source, importObject);
       };
-      console.log("Happy developing \u2728");
-      var WASM_EXEC = "http://localhost:8000/wasm_exec.js";
-      function loadWasm() {
-        if (!WebAssembly.instantiateStreaming) {
-          WebAssembly.instantiateStreaming = (resp, importObject) => __awaiter(this, void 0, void 0, function* () {
-            const source = yield (yield resp).arrayBuffer();
-            return yield WebAssembly.instantiate(source, importObject);
-          });
-        }
-        const go = new Go();
-        let mod, inst;
-        WebAssembly.instantiateStreaming(fetch("http://localhost:8000/falcon.wasm"), go.importObject).then((result) => {
-          mod = result.module;
-          inst = result.instance;
-          console.clear();
-          go.run(inst);
-          inst = WebAssembly.instantiate(mod, go.importObject);
-        }).catch((err) => {
-          console.error(err);
-        });
-      }
-      var script = document.createElement("script");
-      script.src = WASM_EXEC;
-      script.async = true;
-      script.onload = (e) => {
-        console.log("Mist JS was Loaded!");
-        loadWasm();
-      };
-      document.head.appendChild(script);
-      var intervalId = setInterval(() => {
-        if (addCodeSpace()) {
-          addMistButton();
-          monitorBlockly();
-          clearInterval(intervalId);
-          console.log("Code space was added!");
-        }
-      }, 1700);
-      window.addEventListener("hashchange", (event) => {
-        monitorBlockly();
-      });
     }
+    const go = new Go();
+    let mod, inst;
+    WebAssembly.instantiateStreaming(fetch(WASM_FILE), go.importObject).then((result) => {
+      mod = result.module;
+      inst = result.instance;
+      console.clear();
+      go.run(inst);
+      inst = WebAssembly.instantiate(mod, go.importObject);
+    }).catch((err) => {
+      console.error(err);
+    });
+  }
+  var script = document.createElement("script");
+  script.src = WASM_EXEC;
+  script.async = true;
+  script.onload = (e) => {
+    console.log("Mist JS was Loaded!");
+    loadWasm();
+  };
+  document.head.appendChild(script);
+  var intervalId = setInterval(() => {
+    if (addCodeSpace()) {
+      addMistButton();
+      monitorBlockly();
+      generateMistAll();
+      clearInterval(intervalId);
+      console.log("Code space was added!");
+    }
+  }, 1700);
+  window.addEventListener("hashchange", (event) => {
+    monitorBlockly();
   });
-  require_index();
 })();

@@ -4,9 +4,21 @@ let currentEditorCode = ""
 
 // == falcon.go ==
 declare function xmlToMist(xmlContent: string): string;
-declare function mistToXml(mistCode: string): string;
+declare function mistToXml(mistCode: string, componentDefinitions: Record<string, string[]>): string;
 declare function mergeSyntaxDiff(humanCode: string, machineCode: string): string;
+
 // == falcon.go ==
+
+// == Type Block App Inventor ==
+interface TBOption {
+    canonicName: string;
+    dropDown?: Record<string, any>;
+    mutatorAttributes?: Record<string, any>;
+}
+
+declare const AI: any;
+
+// == Type Block App Inventor ==
 
 function getBlock(blockId: string) {
     return (window as any).Blockly?.getMainWorkspace()?.getBlockById(blockId);
@@ -35,12 +47,14 @@ export function monitorBlockly() {
     }
 }
 
-function generateMistAll() {
+export function generateMistAll() {
     const allXmlBlockIds = (window as any).Blockly?.getMainWorkspace()
         .getTopBlocks()
         .filter((block: any) => FILTER_BLOCKS.indexOf(block.type) > -1)
         .map((block: any) => block.id);
-    translateToMist(getManyXmlCodes(allXmlBlockIds))
+    if (allXmlBlockIds.length > 0) {
+        translateToMist(getManyXmlCodes(allXmlBlockIds))
+    }
 }
 
 // Blocks -> Mist
@@ -52,22 +66,45 @@ function translateToMist(xmlContent: string) {
         const mistFrame = document.getElementById("mistFrame") as HTMLIFrameElement | null
         if (mistFrame == null) {
             console.log("Mist frame is null!")
-        } else {
+        } else if (currentEditorCode != null) {
             const mergedCode = mergeSyntaxDiff(currentEditorCode, mistCode)
-            console.log("MergedCode: ", mergedCode)
             mistFrame.contentWindow?.postMessage({type: "mistCode", value: mergedCode}, '*')
             currentEditorCode = mergedCode
+        } else {
+            mistFrame.contentWindow?.postMessage({type: "mistCode", value: mistCode}, '*')
         }
     } catch (error) {
         console.log(error)
     }
 }
 
+function getComponentDefinitions() {
+    AI?.Blockly?.TypeBlock?.prototype?.generateOptions()
+    const tbOptions = AI?.Blockly?.TypeBlock?.prototype?.TBOptions_ as Record<string, TBOption> | undefined;
+
+    const componentMap: Record<string, string[]> = {};
+    if (!tbOptions) {
+        return componentMap
+    }
+    Object.values(tbOptions)
+        .filter(value => value.canonicName === "component_component_block" && value.mutatorAttributes)
+        .forEach(value => {
+            const mutator = value.mutatorAttributes!;
+            const componentType = mutator.component_type;
+            const instanceName = mutator.instance_name;
+            if (!componentMap[componentType]) {
+                componentMap[componentType] = [];
+            }
+            componentMap[componentType].push(instanceName);
+        });
+    return componentMap
+}
+
 // Mist -> XML
 function translateToBlocks(mistCode: string) {
     currentEditorCode = mistCode
     try {
-        const xmlCode = mistToXml(mistCode)
+        const xmlCode = mistToXml(mistCode, getComponentDefinitions())
         console.log("Generated XML Code:", xmlCode)
         renderBlocks(xmlCode)
         skipBlockChanges = true

@@ -5,11 +5,12 @@
 // ==/UserScript==
 
 import {addCodeSpace, addMistButton} from "./cat_frame";
-import {monitorBlockly} from "./cat_blockly";
+import {generateMistAll, monitorBlockly} from "./cat_blockly";
 
 console.log('Happy developing ✨')
 
-const WASM_EXEC = "http://localhost:8000/wasm_exec.js"
+const WASM_EXEC = "static/js/wasm_exec.js"
+const WASM_FILE = "static/wasm/falcon.wasm"
 
 // == wasam.go ==
 declare var Go: any;
@@ -25,7 +26,7 @@ function loadWasm() {
 
   const go = new Go();
   let mod, inst;
-  WebAssembly.instantiateStreaming(fetch("http://localhost:8000/falcon.wasm"), go.importObject).then((result) => {
+  WebAssembly.instantiateStreaming(fetch(WASM_FILE), go.importObject).then((result) => {
     mod = result.module;
     inst = result.instance;
 
@@ -53,6 +54,7 @@ const intervalId = setInterval(() => {
   if (addCodeSpace()) {
     addMistButton()
     monitorBlockly()
+    generateMistAll()
     clearInterval(intervalId)
     console.log("Code space was added!")
   }
